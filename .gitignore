@@ -1,0 +1,19 @@
+# Python
+__pycache__/
+*.pyc
+.venv/
+backend/data/
+*.db
+
+# Node / build artifacts
+node_modules/
+frontend/dist/
+backend/static/
+
+# Secrets & runtime data
+.env
+backups/
+
+# Misc
+.git/
+.DS_Store

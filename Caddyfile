@@ -1,0 +1,6 @@
+# DOMAIN=crm.yoursalon.ru  → Caddy automatically obtains & renews Let's Encrypt TLS (HTTPS)
+# DOMAIN unset / ":80"     → plain HTTP on port 80 (for first launch / IP testing)
+{$DOMAIN::80} {
+	encode gzip
+	reverse_proxy backend:8000
+}
