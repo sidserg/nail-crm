@@ -10,7 +10,7 @@ class Settings(BaseSettings):
     model_config = SettingsConfigDict(env_file=".env", env_file_encoding="utf-8", extra="ignore")
 
     # Database: PostgreSQL in production, SQLite for local demo
-    database_url: str = f"sqlite:///{BASE_DIR / 'data' / 'dev.db'}"
+    database_url: str = "sqlite:////data/nailcrm.db"
 
     # Auth
     jwt_secret: str = "change-me-in-production"
