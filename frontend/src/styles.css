@@ -330,3 +330,14 @@ textarea.input { resize: vertical; min-height: 64px; }
   .overview-cell .day-num { font-size: 13px; }
   .overview-month-title { min-width: 130px; font-size: 15px; }
 }
+
+/* Time blocks (locked slots) */
+.appt.block {
+  background: #e9e9ee !important;
+  border-left: 3px solid #9a9aa5 !important;
+  color: #55555f !important;
+  cursor: pointer;
+  z-index: 3;
+}
+.appt.block:hover { background: #dcdce3 !important; }
+.appt.block .n { font-weight: 600; }

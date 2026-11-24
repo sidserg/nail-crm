@@ -10,8 +10,70 @@ import {
 
 const ROW = 48
 
+/* ================= Slot action modal (choose: book / block) ================= */
+function SlotActionModal({ slot, dateStr, onClose, onBookClient, onBlocked }) {
+  const [mode, setMode] = useState('choose')
+  const [comment, setComment] = useState('')
+  const [busy, setBusy] = useState(false)
+  const toast = useToast()
+
+  const startMin = dtToMin(slot.start)
+  const endMin = dtToMin(slot.end)
+
+  const submitBlock = async () => {
+    setBusy(true)
+    try {
+      await api('/time-blocks', {
+        method: 'POST',
+        body: {
+          start_at: makeDT(dateStr, startMin),
+          end_at: makeDT(dateStr, endMin),
+          comment: comment.trim(),
+        },
+      })
+      toast('Время заблокировано 🔒')
+      onBlocked()
+      onClose()
+    } catch (e) {
+      toast(e.message, 'err')
+    } finally {
+      setBusy(false)
+    }
+  }
+
+  return (
+    <Modal title={`Слот ${minToHHMM(startMin)}–${minToHHMM(endMin)}`} onClose={onClose}>
+      {mode === 'choose' ? (
+        <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
+          <div className="small muted">Что сделать с этим временем?</div>
+          <button className="btn" onClick={() => onBookClient(startMin)}>📅 Записать клиента</button>
+          <button className="btn secondary" onClick={() => setMode('block')}>🔒 Заблокировать время</button>
+        </div>
+      ) : (
+        <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
+          <Field label="Комментарий">
+            <input
+              className="input"
+              autoFocus
+              value={comment}
+              onChange={(e) => setComment(e.target.value)}
+              placeholder="Обед / Больничный / Личное…"
+            />
+          </Field>
+          <div className="flex-between mt">
+            <button className="btn ghost" onClick={() => setMode('choose')}>Назад</button>
+            <button className="btn" disabled={busy} onClick={submitBlock}>
+              {busy ? 'Сохранение…' : 'Заблокировать'}
+            </button>
+          </div>
+        </div>
+      )}
+    </Modal>
+  )
+}
+
 /* ================= Day grid ================= */
-function DayGrid({ settings, appts, dateStr, showCancelled, onSlot, onAppt }) {
+function DayGrid({ settings, appts, blocks, dateStr, showCancelled, onSlot, onAppt, onBlock }) {
   const startMin = hhmmToMin(settings.work_start)
   const endMin = hhmmToMin(settings.work_end)
   const step = Number(settings.slot_step)
@@ -41,6 +103,27 @@ function DayGrid({ settings, appts, dateStr, showCancelled, onSlot, onAppt }) {
           </div>
         )
       })}
+
+      {/* Заблокированные интервалы — серый, с замком */}
+      {blocks.map((b) => {
+        const s = dtToMin(b.start_at)
+        const e = dtToMin(b.end_at)
+        const top = Math.max(0, ((s - startMin) / step) * ROW)
+        const h = Math.max(24, ((e - s) / step) * ROW - 4)
+        return (
+          <div
+            key={'b' + b.id}
+            className="appt block"
+            style={{ top: top + 2, height: h }}
+            onClick={(ev) => { ev.stopPropagation(); onBlock(b) }}
+            title={b.comment || 'Заблокировано'}
+          >
+            <span className="t">🔒 {minToHHMM(s)}–{minToHHMM(e)}</span>
+            <span className="n">{b.comment || 'Блокировка'}</span>
+          </div>
+        )
+      })}
+
       {visible.map((a) => {
         const s = dtToMin(a.start_at)
         const e = dtToMin(a.end_at)
@@ -335,18 +418,22 @@ export default function CalendarPage() {
     dateParam && /^\d{4}-\d{2}-\d{2}$/.test(dateParam) ? dateParam : todayStr()
   )
   const [appts, setAppts] = useState(null)
+  const [blocks, setBlocks] = useState([])
   const [showCancelled, setShowCancelled] = useState(false)
   const [modal, setModal] = useState(null)
+  const [slotModal, setSlotModal] = useState(null)
 
   const load = useCallback(() => {
-    api('/appointments', { params: { from: dateStr, to: dateStr } })
-      .then(setAppts)
+    Promise.all([
+      api('/appointments', { params: { from: dateStr, to: dateStr } }),
+      api('/time-blocks', { params: { from: dateStr, to: dateStr } }),
+    ])
+      .then(([a, b]) => { setAppts(a); setBlocks(b) })
       .catch((e) => toast(e.message, 'err'))
   }, [dateStr])
 
   useEffect(() => { setAppts(null); load() }, [load])
 
-  // Support navigation from Overview: /?date=YYYY-MM-DD
   useEffect(() => {
     if (dateParam && /^\d{4}-\d{2}-\d{2}$/.test(dateParam)) setDateStr(dateParam)
   }, [dateParam])
@@ -366,6 +453,15 @@ export default function CalendarPage() {
   const planned = active.reduce((s, a) => s + (a.price || 0), 0)
   const doneSum = done.reduce((s, a) => s + (a.price || 0), 0)
 
+  const removeBlock = async (b) => {
+    if (!confirm(`Снять блокировку «${b.comment || 'без комментария'}»?`)) return
+    try {
+      await api(`/time-blocks/${b.id}`, { method: 'DELETE' })
+      toast('Блокировка снята')
+      load()
+    } catch (e) { toast(e.message, 'err') }
+  }
+
   return (
     <div>
       <div className="cal-head">
@@ -384,6 +480,7 @@ export default function CalendarPage() {
         <span className="sum-chip">Записей: <b>{active.length}</b></span>
         <span className="sum-chip">План: <b>{money(planned)}</b></span>
         <span className="sum-chip">Выполнено: <b>{money(doneSum)}</b></span>
+        {blocks.length > 0 && <span className="sum-chip">Блокировок: <b>{blocks.length}</b></span>}
         {active.length > 0 && <span className="sum-chip">Загрузка: <b>{Math.round(active.reduce((s, a) => s + (dtToMin(a.end_at) - dtToMin(a.start_at)), 0) / (hhmmToMin(settings.work_end) - hhmmToMin(settings.work_start)) * 100)}%</b></span>}
       </div>
 
@@ -391,17 +488,22 @@ export default function CalendarPage() {
         <DayGrid
           settings={settings}
           appts={appts}
+          blocks={blocks}
           dateStr={dateStr}
           showCancelled={showCancelled}
-          onSlot={(m) => setModal({ startMin: m })}
+          onSlot={(m) => setSlotModal({
+            start: makeDT(dateStr, m),
+            end: makeDT(dateStr, m + Number(settings.slot_step)),
+          })}
           onAppt={(a) => setModal({ appt: a })}
+          onBlock={removeBlock}
         />
       )}
 
       <div className="legend">
         <span><span className="dot" style={{ background: 'var(--rose)' }} />Подтверждена</span>
         <span><span className="dot" style={{ background: 'var(--green)' }} />Выполнена</span>
-        <span><span className="dot" style={{ background: 'var(--amber)' }} />Неявка</span>
+        <span><span className="dot" style={{ background: '#bbb' }} />Блокировка 🔒</span>
         <span>🌐 онлайн-запись</span>
         <label>
           <input type="checkbox" checked={showCancelled} onChange={(e) => setShowCancelled(e.target.checked)} />
@@ -417,6 +519,16 @@ export default function CalendarPage() {
           presetClientId={modal.presetClientId}
           onClose={() => setModal(null)}
           onSaved={() => { setModal(null); load() }}
+        />
+      )}
+
+      {slotModal && !modal && (
+        <SlotActionModal
+          slot={slotModal}
+          dateStr={dateStr}
+          onClose={() => setSlotModal(null)}
+          onBookClient={(m) => { setSlotModal(null); setModal({ startMin: m }) }}
+          onBlocked={load}
         />
       )}
     </div>

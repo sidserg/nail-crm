@@ -1,6 +1,6 @@
 from datetime import date, datetime
 
-from pydantic import BaseModel, ConfigDict, Field, field_validator
+from pydantic import BaseModel, ConfigDict, Field, field_validator, ValidationInfo
 
 
 def strip_tz(v: datetime | None) -> datetime | None:
@@ -154,3 +154,28 @@ class BookIn(BaseModel):
     comment: str = Field(default="", max_length=500)
 
     _tz = field_validator("start_at")(strip_tz)
+
+
+# ---------- Time Blocks ----------
+class TimeBlockCreate(BaseModel):
+    start_at: datetime
+    end_at: datetime
+    comment: str = Field(default="", max_length=255)
+
+    _tz = field_validator("start_at")(strip_tz)
+    _tz_end = field_validator("end_at")(strip_tz)
+
+    @field_validator("end_at")
+    @classmethod
+    def end_after_start(cls, v: datetime, info: ValidationInfo) -> datetime:
+        start = info.data.get("start_at")
+        if start is not None and v <= start:
+            raise ValueError("Конец блокировки должен быть позже начала")
+        return v
+
+
+class TimeBlockOut(ORMModel):
+    id: int
+    start_at: datetime
+    end_at: datetime
+    comment: str

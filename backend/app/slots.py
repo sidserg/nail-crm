@@ -4,7 +4,7 @@ from datetime import date, datetime, time, timedelta
 from fastapi import HTTPException
 from sqlalchemy.orm import Session
 
-from .models import Appointment, BLOCKING_STATUSES, Service, Setting
+from .models import Appointment, BLOCKING_STATUSES, Service, Setting, TimeBlock
 
 SETTINGS_DEFAULTS: dict[str, str] = {
     "salon_name": "Студия маникюра",
@@ -56,11 +56,13 @@ def validate_settings(data: dict) -> None:
         raise HTTPException(422, "Некорректные рабочие дни")
 
 
-def busy_intervals(db: Session, day: date) -> list[Appointment]:
+def busy_intervals_combined(db: Session, day: date) -> list[tuple[datetime, datetime]]:
+    """Все занятые интервалы дня: активные записи + блокировки мастера."""
     day_start = datetime.combine(day, time.min)
     day_end = day_start + timedelta(days=1)
-    return (
-        db.query(Appointment)
+    intervals: list[tuple[datetime, datetime]] = []
+    intervals += (
+        db.query(Appointment.start_at, Appointment.end_at)
         .filter(
             Appointment.status.in_(BLOCKING_STATUSES),
             Appointment.start_at < day_end,
@@ -68,9 +70,16 @@ def busy_intervals(db: Session, day: date) -> list[Appointment]:
         )
         .all()
     )
+    intervals += (
+        db.query(TimeBlock.start_at, TimeBlock.end_at)
+        .filter(TimeBlock.start_at < day_end, TimeBlock.end_at > day_start)
+        .all()
+    )
+    return intervals
 
 
 def check_overlap(db: Session, start: datetime, end: datetime, exclude_id: int | None = None) -> None:
+    """Конфликт с записью или с блокировкой -> 409."""
     q = db.query(Appointment).filter(
         Appointment.status.in_(BLOCKING_STATUSES),
         Appointment.start_at < end,
@@ -80,6 +89,14 @@ def check_overlap(db: Session, start: datetime, end: datetime, exclude_id: int |
         q = q.filter(Appointment.id != exclude_id)
     if q.first() is not None:
         raise HTTPException(409, "Это время уже занято другой записью")
+
+    if (
+        db.query(TimeBlock)
+        .filter(TimeBlock.start_at < end, TimeBlock.end_at > start)
+        .first()
+        is not None
+    ):
+        raise HTTPException(409, "Это время заблокировано мастером")
 
 
 def get_slots(db: Session, day: date, service_id: int | None, public: bool = False) -> list[dict]:
@@ -97,7 +114,7 @@ def get_slots(db: Session, day: date, service_id: int | None, public: bool = Fal
     start_min, end_min = hhmm_to_min(st["work_start"]), hhmm_to_min(st["work_end"])
     step = int(st["slot_step"])
     day_start = datetime.combine(day, time.min)
-    busy = busy_intervals(db, day)
+    busy = busy_intervals_combined(db, day)
     now = datetime.now()
     lead = timedelta(minutes=int(st["min_lead_minutes"]))
 
@@ -106,7 +123,7 @@ def get_slots(db: Session, day: date, service_id: int | None, public: bool = Fal
     while m + duration <= end_min:
         s = day_start + timedelta(minutes=m)
         e = s + timedelta(minutes=duration)
-        free = all(not (s < b.end_at and e > b.start_at) for b in busy)
+        free = all(not (s < b_end and e > b_start) for b_start, b_end in busy)
         if public and s < now + lead:
             free = False
         slots.append({"start": s, "end": e, "available": free})

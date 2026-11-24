@@ -111,3 +111,20 @@ class Setting(Base):
 
     key: Mapped[str] = mapped_column(String(64), primary_key=True)
     value: Mapped[str] = mapped_column(String(255), nullable=False)
+
+
+class TimeBlock(Base):
+    """Личные блокировки времени мастера (обед, больничный, личные дела)."""
+    __tablename__ = "time_blocks"
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True)
+    start_at: Mapped[datetime] = mapped_column(DateTime, nullable=False)
+    end_at: Mapped[datetime] = mapped_column(DateTime, nullable=False)
+    comment: Mapped[str] = mapped_column(String(255), default="")
+    created_at: Mapped[datetime] = mapped_column(DateTime, server_default=func.now())
+
+    __table_args__ = (
+        Index("ix_time_blocks_start", "start_at"),
+    )
+
+
