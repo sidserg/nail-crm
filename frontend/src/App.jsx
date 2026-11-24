@@ -4,6 +4,7 @@ import { api, getToken, setToken } from './api.js'
 import { PageLoading, ToastProvider } from './ui.jsx'
 import Login from './pages/Login.jsx'
 import CalendarPage from './pages/CalendarPage.jsx'
+import OverviewPage from './pages/OverviewPage.jsx'
 import ClientsPage from './pages/ClientsPage.jsx'
 import ServicesPage from './pages/ServicesPage.jsx'
 import AnalyticsPage from './pages/AnalyticsPage.jsx'
@@ -15,6 +16,7 @@ export const useSettings = () => useContext(SettingsCtx)
 
 const NAV = [
   { to: '/', label: 'Календарь', ico: '📅' },
+  { to: '/overview', label: 'Обзор', ico: '👁️' },
   { to: '/clients', label: 'Клиенты', ico: '👥' },
   { to: '/analytics', label: 'Финансы', ico: '📊' },
   { to: '/services', label: 'Услуги', ico: '💅' },
@@ -73,6 +75,7 @@ function Private() {
       <Layout>
         <Routes>
           <Route path="/" element={<CalendarPage />} />
+          <Route path="/overview" element={<OverviewPage />} />
           <Route path="/clients" element={<ClientsPage />} />
           <Route path="/services" element={<ServicesPage />} />
           <Route path="/analytics" element={<AnalyticsPage />} />

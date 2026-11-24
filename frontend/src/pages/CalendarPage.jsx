@@ -330,7 +330,10 @@ export default function CalendarPage() {
   const { settings } = useSettings()
   const toast = useToast()
   const [params, setParams] = useSearchParams()
-  const [dateStr, setDateStr] = useState(todayStr())
+  const dateParam = params.get('date')
+  const [dateStr, setDateStr] = useState(() =>
+    dateParam && /^\d{4}-\d{2}-\d{2}$/.test(dateParam) ? dateParam : todayStr()
+  )
   const [appts, setAppts] = useState(null)
   const [showCancelled, setShowCancelled] = useState(false)
   const [modal, setModal] = useState(null)
@@ -343,13 +346,20 @@ export default function CalendarPage() {
 
   useEffect(() => { setAppts(null); load() }, [load])
 
+  // Support navigation from Overview: /?date=YYYY-MM-DD
+  useEffect(() => {
+    if (dateParam && /^\d{4}-\d{2}-\d{2}$/.test(dateParam)) setDateStr(dateParam)
+  }, [dateParam])
+
   useEffect(() => {
     const cid = params.get('client')
     if (cid) {
       setModal({ presetClientId: Number(cid), startMin: null })
-      setParams({}, { replace: true })
+      const next = new URLSearchParams(params)
+      next.delete('client')
+      setParams(next, { replace: true })
     }
-  }, [])
+  }, [params, setParams])
 
   const active = (appts || []).filter((a) => a.status === 'confirmed' || a.status === 'completed')
   const done = (appts || []).filter((a) => a.status === 'completed')

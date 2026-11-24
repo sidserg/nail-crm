@@ -9,8 +9,8 @@ from fastapi.staticfiles import StaticFiles
 
 from .config import settings
 from .database import SessionLocal
-from .routers import (appointments, auth, clients, finance, public, services,
-                      settings as settings_router)
+from .routers import (appointments, auth, clients, finance, overview, public,
+                      services, settings as settings_router)
 from .seed import seed
 
 logging.basicConfig(level=logging.INFO, format="%(asctime)s %(name)s %(levelname)s %(message)s")
@@ -49,6 +49,7 @@ app.include_router(auth.router)
 app.include_router(clients.router)
 app.include_router(services.router)
 app.include_router(appointments.router)
+app.include_router(overview.router)
 app.include_router(finance.router)
 app.include_router(settings_router.router)
 app.include_router(public.router)

@@ -290,3 +290,43 @@ textarea.input { resize: vertical; min-height: 64px; }
 /* block layout inside non-compact appointment cards */
 .appt:not(.compact) .t, .appt:not(.compact) .n, .appt:not(.compact) .s { display: block; }
 .appt:not(.compact) .n { padding-right: 52px; }
+
+/* ---------- Overview heatmap ---------- */
+.overview-month { display: flex; align-items: center; gap: 8px; }
+.overview-month-title { min-width: 170px; text-align: center; font-size: 17px; font-weight: 800; text-transform: capitalize; }
+.overview-grid { display: grid; grid-template-columns: repeat(7, minmax(0, 1fr)); gap: 8px; }
+.overview-weekdays { margin-bottom: 8px; }
+.overview-weekday { text-align: center; font-size: 12px; font-weight: 700; color: var(--muted); padding: 4px 0; }
+.overview-cell {
+  appearance: none; display: flex; flex-direction: column; align-items: flex-start; justify-content: space-between;
+  min-height: 76px; padding: 8px; border-radius: 12px; border: 1.5px solid var(--line);
+  background: #fff; color: var(--ink); font: inherit; text-align: left; cursor: default;
+}
+.overview-cell.empty { background: transparent; border-color: transparent; }
+.overview-cell:disabled { cursor: default; opacity: 1; }
+.overview-cell.clickable { cursor: pointer; }
+.overview-cell.clickable:hover { border-color: var(--rose); box-shadow: 0 2px 10px rgba(140, 50, 100, 0.12); }
+.overview-cell .day-num { font-size: 15px; font-weight: 800; line-height: 1; }
+.overview-cell .day-count { font-size: 12px; font-weight: 700; opacity: 0.85; }
+.overview-cell.heat-0 { background: #fff; }
+.overview-cell.heat-1 { background: #dcfce7; }
+.overview-cell.heat-2 { background: #fef9c3; }
+.overview-cell.heat-3 { background: #fee2e2; }
+.overview-cell.heat-4 { background: #dbeafe; }
+.overview-cell.heat-5 { background: #000; color: #fff; border-color: #000; }
+.overview-cell.heat-5 .day-count { opacity: 0.9; }
+.overview-legend { display: flex; flex-wrap: wrap; gap: 12px; margin-top: 14px; font-size: 12.5px; color: var(--muted); }
+.overview-legend span { display: inline-flex; align-items: center; gap: 6px; }
+.overview-swatch { width: 14px; height: 14px; border-radius: 4px; border: 1px solid var(--line); display: inline-block; }
+.overview-swatch.heat-0 { background: #fff; }
+.overview-swatch.heat-1 { background: #dcfce7; }
+.overview-swatch.heat-2 { background: #fef9c3; }
+.overview-swatch.heat-3 { background: #fee2e2; }
+.overview-swatch.heat-4 { background: #dbeafe; }
+.overview-swatch.heat-5 { background: #000; border-color: #000; }
+@media (max-width: 640px) {
+  .overview-grid { gap: 5px; }
+  .overview-cell { min-height: 56px; padding: 6px; border-radius: 10px; }
+  .overview-cell .day-num { font-size: 13px; }
+  .overview-month-title { min-width: 130px; font-size: 15px; }
+}
