@@ -341,3 +341,13 @@ textarea.input { resize: vertical; min-height: 64px; }
 }
 .appt.block:hover { background: #dcdce3 !important; }
 .appt.block .n { font-weight: 600; }
+
+/* Прошедшее время в сетке календаря */
+.grid-row.past {
+  background: #f5f5f5 !important;
+  cursor: not-allowed !important;
+}
+.grid-row.past .grid-time {
+  color: #bbb !important;
+  text-decoration: line-through;
+}

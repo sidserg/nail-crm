@@ -91,13 +91,14 @@ function DayGrid({ settings, appts, blocks, dateStr, showCancelled, onSlot, onAp
     <div className="grid" style={{ height: rows * ROW }}>
       {Array.from({ length: rows }).map((_, i) => {
         const m = startMin + i * step
+        const isPast = isToday && m < now
         return (
           <div
             key={i}
-            className={'grid-row' + (m % 60 !== 0 ? ' half' : '')}
+            className={'grid-row' + (m % 60 !== 0 ? ' half' : '') + (isPast ? ' past' : '')}
             style={{ top: i * ROW, height: ROW }}
-            title={`Записать на ${minToHHMM(m)}`}
-            onClick={() => onSlot(m)}
+            title={isPast ? 'Время прошло' : `Записать на ${minToHHMM(m)}`}
+            onClick={() => !isPast && onSlot(m)}
           >
             <span className="grid-time">{minToHHMM(m)}</span>
           </div>
