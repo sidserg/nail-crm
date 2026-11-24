@@ -10,6 +10,15 @@ import {
 
 const ROW = 48
 
+/* Hard guard: a booking cannot start in the past (browser wall-clock).
+   dateStr is ISO YYYY-MM-DD, so lexical comparison with today is safe. */
+const isPastSlot = (dateStr, min) => {
+  const today = todayStr()
+  if (dateStr < today) return true
+  if (dateStr === today) return min < nowMin()
+  return false
+}
+
 /* ================= Slot action modal (choose: book / block) ================= */
 function SlotActionModal({ slot, dateStr, onClose, onBookClient, onBlocked }) {
   const [mode, setMode] = useState('choose')
@@ -86,12 +95,13 @@ function DayGrid({ settings, appts, blocks, dateStr, showCancelled, onSlot, onAp
 
   const visible = appts.filter((a) => showCancelled || a.status !== 'cancelled')
   const isToday = dateStr === todayStr()
+  const isPastDay = dateStr < todayStr()
 
   return (
     <div className="grid" style={{ height: rows * ROW }}>
       {Array.from({ length: rows }).map((_, i) => {
         const m = startMin + i * step
-        const isPast = isToday && m < now
+        const isPast = isPastDay || (isToday && m < now)
         return (
           <div
             key={i}
@@ -289,7 +299,11 @@ function BookingModal({ dateStr, startMin, appt, presetClientId, onClose, onSave
 
   const freeOptions = useMemo(() => {
     if (!slots) return []
-    const opts = slots.filter((s) => s.available).map((s) => dtToMin(s.start))
+    // Server 'available' can go stale while the modal is open — drop past times locally too
+    const opts = slots
+      .filter((s) => s.available)
+      .map((s) => dtToMin(s.start))
+      .filter((m) => !isPastSlot(dateLocal, m))
     if (editing && dateLocal === dtToDate(appt.start_at)) {
       const orig = dtToMin(appt.start_at)
       if (!opts.includes(orig)) opts.push(orig)
@@ -313,6 +327,11 @@ function BookingModal({ dateStr, startMin, appt, presetClientId, onClose, onSave
   }
 
   const save = async () => {
+    // Hard guard: even if backend fails, reject past times on the client
+    if (!editing && isPastSlot(dateLocal, timeMin)) {
+      toast('Нельзя создать запись на прошедшее время', 'err')
+      return
+    }
     setBusy(true)
     try {
       const body = {
@@ -367,11 +386,14 @@ function BookingModal({ dateStr, startMin, appt, presetClientId, onClose, onSave
         <Field label="Начало">
           <select className="input" value={timeMin ?? ''} onChange={(e) => setTimeMin(Number(e.target.value))}>
             {slots === null && <option value="">…</option>}
-            {slots !== null && freeOptions.length === 0 && <option value="">Нет свободных окон</option>}
+            {slots !== null && freeOptions.length === 0 && <option value="">Нет свободного времени на эту дату</option>}
             {freeOptions.map((m) => <option key={m} value={m}>{minToHHMM(m)}</option>)}
           </select>
         </Field>
       </div>
+      {slots !== null && freeOptions.length === 0 && (
+        <div className="small muted mb">Нет свободного времени на эту дату</div>
+      )}
       {service && timeMin != null && (
         <div className="small muted mb">
           Окончание: <b>{minToHHMM(timeMin + service.duration_min)}</b> · длительность {durationLabel(service.duration_min)} — время подобрано без накладок
@@ -400,7 +422,11 @@ function BookingModal({ dateStr, startMin, appt, presetClientId, onClose, onSave
         {editing ? <button className="btn danger" onClick={remove}>Удалить</button> : <span />}
         <div style={{ display: 'flex', gap: 8 }}>
           <button className="btn ghost" onClick={onClose}>Отмена</button>
-          <button className="btn" disabled={busy || !clientObj || !serviceId || timeMin == null} onClick={save}>
+          <button
+            className="btn"
+            disabled={busy || !clientObj || !serviceId || timeMin == null || (!editing && isPastSlot(dateLocal, timeMin))}
+            onClick={save}
+          >
             {editing ? 'Сохранить' : 'Записать'}
           </button>
         </div>

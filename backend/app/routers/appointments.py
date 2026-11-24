@@ -1,8 +1,10 @@
 from datetime import date, datetime, time, timedelta
+from zoneinfo import ZoneInfo
 
 from fastapi import APIRouter, Depends, HTTPException, Query
 from sqlalchemy.orm import Session, joinedload
 
+from ..config import settings
 from ..database import get_db
 from ..deps import get_current_user
 from ..models import Appointment, Client, Service, STATUSES
@@ -11,6 +13,14 @@ from ..schemas import (AppointmentCreate, AppointmentOut, AppointmentPatch,
 from ..slots import check_overlap, get_slots
 
 router = APIRouter(prefix="/api", tags=["appointments"], dependencies=[Depends(get_current_user)])
+
+
+def _salon_now() -> datetime:
+    """Wall-clock time in the salon timezone (settings.tz), naive like all stored times.
+
+    Container TZ may differ from settings.tz, so datetime.now() alone is unsafe.
+    """
+    return datetime.now(ZoneInfo(settings.tz)).replace(tzinfo=None)
 
 
 def _load(db: Session, appt_id: int) -> Appointment:
@@ -44,8 +54,8 @@ def list_appointments(
 
 @router.post("/appointments", response_model=AppointmentOut, status_code=201)
 def create_appointment(body: AppointmentCreate, db: Session = Depends(get_db)):
-    if body.start_at < datetime.now():
-        raise HTTPException(400, detail="Нельзя записаться на прошедшее время")
+    if body.start_at < _salon_now():
+        raise HTTPException(400, detail="Нельзя создать запись на прошедшее время")
     client = db.get(Client, body.client_id)
     service = db.get(Service, body.service_id)
     if client is None:
@@ -97,7 +107,7 @@ def update_appointment(appt_id: int, body: AppointmentPatch, db: Session = Depen
         if (
             new_start is not None
             and new_start != appt.start_at
-            and new_start < datetime.now()
+            and new_start < _salon_now()
         ):
             raise HTTPException(400, detail="Нельзя перенести запись на прошедшее время")
         service = db.get(Service, appt.service_id)
