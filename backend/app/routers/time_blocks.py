@@ -14,6 +14,8 @@ router = APIRouter(prefix="/api", tags=["time-blocks"], dependencies=[Depends(ge
 
 @router.post("/time-blocks", response_model=TimeBlockOut, status_code=201)
 def create_time_block(body: TimeBlockCreate, db: Session = Depends(get_db)):
+    if body.start_at < datetime.now():
+        raise HTTPException(400, detail="Нельзя заблокировать прошедшее время")
     check_overlap(db, body.start_at, body.end_at)
     block = TimeBlock(
         start_at=body.start_at,

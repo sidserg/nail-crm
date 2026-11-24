@@ -44,6 +44,8 @@ def list_appointments(
 
 @router.post("/appointments", response_model=AppointmentOut, status_code=201)
 def create_appointment(body: AppointmentCreate, db: Session = Depends(get_db)):
+    if body.start_at < datetime.now():
+        raise HTTPException(400, detail="Нельзя записаться на прошедшее время")
     client = db.get(Client, body.client_id)
     service = db.get(Service, body.service_id)
     if client is None:
@@ -91,8 +93,15 @@ def update_appointment(appt_id: int, body: AppointmentPatch, db: Session = Depen
 
     # Reschedule / service change -> recompute end time and re-check overlaps
     if "start_at" in data or "service_id" in data:
+        new_start = data.get("start_at")
+        if (
+            new_start is not None
+            and new_start != appt.start_at
+            and new_start < datetime.now()
+        ):
+            raise HTTPException(400, detail="Нельзя перенести запись на прошедшее время")
         service = db.get(Service, appt.service_id)
-        start = data.get("start_at") or appt.start_at
+        start = new_start or appt.start_at
         end = start + timedelta(minutes=service.duration_min)
         check_overlap(db, start, end, exclude_id=appt.id)
         appt.start_at, appt.end_at = start, end

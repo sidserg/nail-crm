@@ -124,7 +124,9 @@ def get_slots(db: Session, day: date, service_id: int | None, public: bool = Fal
         s = day_start + timedelta(minutes=m)
         e = s + timedelta(minutes=duration)
         free = all(not (s < b_end and e > b_start) for b_start, b_end in busy)
-        if public and s < now + lead:
+        if s < now:
+            free = False
+        elif public and s < now + lead:
             free = False
         slots.append({"start": s, "end": e, "available": free})
         m += step
